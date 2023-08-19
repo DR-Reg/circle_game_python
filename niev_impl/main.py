@@ -2,7 +2,7 @@ import pygame
 import math
 import numpy as np
 from colorama import Fore
-import time
+import os
 
 window = pygame.display.set_mode((500, 500))
 active = True
@@ -20,6 +20,7 @@ score = 0
 
 all_lines = [[]]
 all_lines_nodes = []
+
 
 def orderNodes():
     from operator import itemgetter
@@ -138,7 +139,6 @@ def find_adjacent_nodes(node):
             ...
     return list(chain.from_iterable(final))
 
-
 def node_dictionary():
     unique_nodes = list(set([item for sublist in all_lines_nodes for item in sublist]))
     # print(unique_nodes)
@@ -148,88 +148,112 @@ def node_dictionary():
         node_guide[n] = find_adjacent_nodes(n)
     return node_guide
 
+def colinearity_check(shape):
+    # in all_line_nodes list
+    # check if there exists a line
+    # that contains three of the points in the shape
+    for line in all_lines_nodes:
+        counter = 0
+        for point in shape:
+            if point in line:
+                counter += 1
+        if counter > 2:
+            # 3 points are on the same line (colinearity overload)
+            return True
+    return False
 
-def check_pentagon(origin, parent, depth, ancestors, myself):
+def check_pentagon(origin, parent, depth, shape, myself):
     # Exit conditions
     if depth > 5:
-        # print(parent, end=
-        # print(ancestors)
-        return False
+        return [False, shape]
     if myself == origin:
-        # print(parent, end=" ")
         if depth == 5:
-            # print(ancestors)
-            # print(Fore.BLUE + "solved")
-            return True
+            global solution
+            solution = shape.copy()
+            # print(solution)
+            return [True, shape]
         else:
-            # print(ancestors)
-            return False
+            return [False, shape]
     if myself is None:
-        # print(parent, end=" ")
-        # print(ancestors)
-        return "Continue" 
+        return [False, shape]
     if myself == parent:
-        # print(parent, end=" ")
-        # print(ancestors)
-        print("WHEYYEY")
-        return "Continue" 
+        return [False, shape]
+    if colinearity_check(shape):
+        return [False, shape]
     # if found:
-    #     return True
-    # if myself in ancestors[1:]:
-    #     return False
+    #     return [True, shape]
 
-    # Iterate over each node
-    # for n in all_nodes:
-    # print(f"Processing node {n}")
     immediate_neighbors = get_immediate_neighbors(myself)
     for neighbor in immediate_neighbors:
-        my_ancestors = ancestors[:]
+        # print(Fore.GREEN + "Starting recur neighbor:" + str(neighbor) + Fore.RESET)
+        my_shape = shape[:]
+        if neighbor not in my_shape or (neighbor == origin and depth > 1):
+            my_shape.append(neighbor)
+            # print(Fore.RED + f"origin={origin}, parent={myself}, depth={depth + 1}, myself={neighbor}, checking shape={my_shape}" + Fore.RESET)
+            check_pentagon(origin=origin, parent=myself, depth=depth+1, myself=neighbor, shape=my_shape)
+        # Leaf Node Detection
+        if len(immediate_neighbors) == 1 and parent == neighbor:
+            neighbor = None
+            check_pentagon(origin=origin, parent=myself, depth=depth + 1, myself=neighbor, shape=my_shape)
 
-        if neighbor == origin and depth != 5:
-            draw_ancestors(neighbor, my_ancestors, random_color())
-            return False
+def computeClick():
 
-        if neighbor not in my_ancestors:
-            my_ancestors.append(neighbor)
-            print(Fore.RED + f"origin={origin}, parent={myself}, depth={depth + 1}, myself={neighbor}, ancestors={my_ancestors}" + Fore.RESET)
-            x = check_pentagon(origin=origin, parent=myself, depth=depth+1, myself=neighbor,
-                           ancestors=my_ancestors)
-            if x == False: return False
-            elif x == True:
-           #  return x
-                draw_ancestors(n, my_ancestors)
-                return True
-            
-def random_color():
-    import random
-    randc = lambda : random.randint(0,255)
-    return (randc(), randc(),randc())
+    # Get all nodes
+    all_nodes = list(node_dictionary().keys())
+    solution = []
+    found = 0
 
+    # os.system('cls' if os.name == 'nt' else 'clear')
+    #
+    # # print(all_lines)
+    # # print(all_lines_nodes)
+    #
+    # print(f"There are {len(all_nodes)} nodes.")
+    # counter = 1
+
+    # Check pentagon
+    for current_node in all_nodes:
+        # print(Fore.GREEN + "Starting new origin:" + str(current_node) + Fore.RESET)
+        shape = []
+        shape.append(current_node)
+        if found:
+            # print("pentagon")
+            pentagonFound = True
+            break
+
+        immediate_neighbors = get_immediate_neighbors(current_node)
+        for neighbor in immediate_neighbors:
+            # print(Fore.GREEN + "Starting new neighbor:" + str(neighbor) + Fore.RESET)
+            my_shape = shape[:]
+            my_shape.append(neighbor)
+            # try:
+            depth = 0
+            origin = current_node
+            myself = current_node
+            # print(Fore.RED + f"origin={origin}, parent={myself}, depth={depth + 1}, myself={neighbor}, checking shape={my_shape}" + Fore.RESET)
+            # check_pentagon(origin=origin, parent=myself, depth=depth + 1, myself=neighbor, shape=my_shape)
+            check_pentagon(origin=origin, parent=myself, depth=depth + 1, myself=neighbor, shape=my_shape)
+
+    return list(set(solution))
+
+### Main
 scaffold = False
 pentagonFound = False
+pentagonFormationPoints = []
+isCheckingPentagon = True
+printColorama = lambda content, color: print(color + f"{content}" + Fore.RESET)
+get_immediate_neighbors = lambda n: node_dictionary()[n]
 
-
-def show_graph(node_dict):
-    print(node_dict)
-    for root in node_dict.keys():
-        neighs = node_dict[root]
-        pygame.draw.circle(window, red, root, 3)
-        for i, n in enumerate(neighs):
-            pygame.draw.line(window, random_color(), root, n, width =3)
-            pygame.draw.circle(window, red, n, 3)
-            time.sleep(0.5)
-            pygame.display.update()
-
-def draw_ancestors(n, ancestors, color):
-    for anc in ancestors:
-        pygame.draw.line(window, color, n, anc, width = 3)
-    pygame.display.update()
-    time.sleep(2)
+# Holds the solution points
+solution = []
 
 while active:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             active = False
+
+        # printColorama(all_lines, Fore.YELLOW)
+        # printColorama(all_lines_nodes, Fore.YELLOW)
 
         # Calculate angle based on mouse position
         mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -265,37 +289,16 @@ while active:
                     scaffold = False
                     score += (len(lintersections["intersections"]) + 2)
 
-                    # nd = node_dictionary()
-                    # show_graph(nd)
+                    computeClick()
+                    if len(solution) > 0:
+                        pentagonFound = True
+                        print(solution)
 
-                    # Check pentagon
-                    get_immediate_neighbors = lambda n: node_dictionary()[n]
-                    # Get all nodes
-                    all_nodes = list(node_dictionary().keys())
-                    consecutive_sides = 0
-                    found = False
-
-                    for n in all_nodes:
-                        ancestors = []
-                        ancestors.append(n)
-                        if found:
-                            print("pentagon")
-                            pentagonFound = True
-                            break
-                        print(Fore.GREEN + "Starting new origin search" + Fore.RESET)
-
-                        immediate_neighbors = get_immediate_neighbors(n)
-                        for neighbor in immediate_neighbors:
-                            ancestors.append(neighbor)
-                            print(
-                                Fore.YELLOW + f"origin={n}, parent={n}, depth=1, myself={neighbor}, ancestors={ancestors}" + Fore.RESET)
-                            if check_pentagon(origin=n, parent=n, depth=1, myself=neighbor, ancestors=ancestors):
-                                draw_ancestors(n, ancestors)
-                                found = True
 
         if scaffold:
             pygame.draw.line(window, blue, all_lines[-1][0], (end_x, end_y), 2)
 
+        # print(Fore.LIGHTMAGENTA_EX + f"{pentagonFormationPoints}")
 
         f = pygame.font.Font(None, 36)
         text = f.render(str(score), True, white)
@@ -312,11 +315,18 @@ while active:
                 pygame.draw.line(window,white,l[0],l[1],2)
                 intersections = lineIntersections(all_lines[:-1])["intersections"]
                 for i in intersections:
-                    pygame.draw.circle(window, green, i, 5)
+                    if not pentagonFound:
+                        pygame.draw.circle(window, red, i, 5)
             except IndexError:
                 pass
 
-
+        if pentagonFound:
+            # print(Fore.CYAN + f"{pentagonFormationPoints}")
+            for p in solution:
+                pygame.draw.circle(window, green, p, 5)
+        else:
+            for n in node_dictionary().keys():
+                pygame.draw.circle(window, blue, n, 5)
 
 
 
