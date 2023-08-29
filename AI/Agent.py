@@ -1,5 +1,8 @@
 import neat
 from neat.nn import FeedForwardNetwork as FFN
+import sys
+from Vector import V2
+import random
 
 class Agent:
     def __init__(self, net):
@@ -9,11 +12,50 @@ class Agent:
         # TODO:  decide what our inputs are
         # NOTE:  remember to update this in config file too
         self.net.activate(inputs)
+    
+class Random(Agent):
+    def __init__(self, pyg, radius, dradius):
+        self.pyg = pyg
+        self.radius = radius
+        self.dradius = dradius
+    
+    def make_move(self,game):
+        game.add_line(random.random(), random.random())
+        game.add_line(random.random(), random.random())
 
+class Human(Agent):
+    def __init__(self, pyg, radius, dradius):
+        self.pyg = pyg
+        self.screen = self.pyg.display.get_surface()
+        self.width, self.height = self.screen.get_size()
+        self.radius = radius
+        self.dradius = dradius
+        self.center = V2(self.width/2, self.height/2)
+    
+    # run in loop until human clicks
+    def make_move(self, game):
+        no_move = True
+        while no_move:
+            for event in self.pyg.event.get():
+                if event.type == self.pyg.QUIT:
+                    sys.exit(0)
+
+                mousevec = V2(*self.pyg.mouse.get_pos()) - self.center
+                end = mousevec.normalise() * self.dradius + self.center
+                game.blit(self.screen)
+                # cursor line
+                self.pyg.draw.line(self.screen, (255,0,0), self.center.tuple, end.tuple)
+                self.pyg.draw.circle(self.screen, (255,0,0), end.tuple, 5)
+
+                if event.type == self.pyg.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        no_move = game.add_line(*end.tuple)
+            self.pyg.display.flip()
+                
 
 def eval_genomes(genomes, config):
     print("Eval genomes has not been implemented completely")
-    raise NotImplemented
+    raise NotImplementedError
 
     # options:
     # - play all vs all
